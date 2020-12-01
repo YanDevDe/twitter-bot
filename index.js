@@ -1,6 +1,8 @@
 require("dotenv").config();
 
-const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
 const twit = require("twit");
 const config = {
   consumer_key: process.env.CONSUMER_KEY,
@@ -8,53 +10,69 @@ const config = {
   access_token: process.env.ACCESS_TOKEN,
   access_token_secret: process.env.ACCESS_TOKEN_SECRET
 };
+
+if (!process.env.HASHTAG_RETWEET) {
+  throw new Error("HASHTAG_RETWEET at .env hasn't been set!")
+}
+
+const hashtag = process.env.HASHTAG_RETWEET.split(",").map((o) => "#" + o.trim()).join(" OR ");
+
+if (!process.env.CHECK_TIME) {
+  throw new Error("CHECK_TIME at .env hasn't been set!")
+}
+const timer = Number(process.env.CHECK_TIME);
+
+if (!process.env.RETWEET_COUNT) {
+  throw new Error("CHECK_TIME at .env hasn't been set!")
+}
+
+const retweet_count = Number(process.env.RETWEET_COUNT);
+
+
+console.log(hashtag + " is being used for retweets");
+
+const latest_id_path = path.resolve(__dirname, "latest_id.txt");
+console.log(latest_id_path);
+
 const Twitter = new twit(config);
 
-const MAX_RT_COUNT = 1;
+let retweetTags = async function () {
+  let latest_id = 0;
 
-const USERS = [
-  "15057943", // moma
-  "14803372", // saam
-  "5225991", // tate
-  "22009731", // design museum
-  "81783051", // artsy
-  "158865339", // fastcodesign
-  "20457080", // nga
-  "24691376", // vangoghmuseum
-  "17057271", // themet
-  "16517711", // whitneymuseum
-  "18201801", // interior design
-  "19038849", // how design
-  "2991948728" // thenewpainting
-];
+  if (fs.existsSync(latest_id_path)) {
+    latest_id = Number(fs.readFileSync(latest_id_path, "utf8"));
+    if (!latest_id) {
+      latest_id = 0;
+    }
+  }
 
-const getUserOfTheDay = () => {
-  let date = new Date();
-  let dayOfMonth = date.getDate();
-  let pickUserIndex = dayOfMonth % USERS.length;
+  console.log("Latest ID", latest_id);
 
-  return USERS[pickUserIndex];
-};
-
-let retweetTags = async function() {
   try {
     const { data } = await Twitter.get("search/tweets", {
-      q: "#art, #painting",
+      q: hashtag,
       result_type: "mixed",
-      lang: "en"
+      lang: "en",
+      count: retweet_count,
+      since_id: latest_id
     });
 
-    const statuses = data.statuses.slice(0, MAX_RT_COUNT);
+    if (data.statuses && data.statuses.length > 0) fs.writeFileSync(latest_id_path, data.statuses[0].id)
+    const statuses = data.statuses.filter((o) => !o.retweeted);
+    console.log("Tweet Count", statuses.length);
+    if (statuses && statuses.length > 0) {
+      fs.writeFileSync(latest_id_path, statuses[0].id)
 
-    // loop through the first n returned tweets
-    for (const status of statuses) {
-      // the post action
-      const response = await Twitter.post("statuses/retweet/:id", {
-        id: status.id_str
-      });
-
-      if (response) {
-        console.log("Successfully retweeted");
+      for (const status of statuses) {
+        // the post action
+        try {
+          await Twitter.post("statuses/retweet/:id", {
+            id: status.id_str
+          });
+          console.log("@" + status.user.screen_name + " with post id " + status.id_str + " were retweeted");
+        } catch (e) {
+          console.error("@" + status.user.screen_name + " with post id " + status.id_str + " couldn't be  retweeted -> " + e.message);
+        }
       }
     }
   } catch (err) {
@@ -63,31 +81,7 @@ let retweetTags = async function() {
   }
 };
 
-// retweetTags();
-
-let retweetUsers = async function() {
-  try {
-    const { data } = await Twitter.get("users/show", {
-      user_id: getUserOfTheDay()
-    });
-    const status = data.status;
-    // make sure tweet isn't in reply to another user
-    if (status.in_reply_to_status_id == null) {
-      const response = await Twitter.post("statuses/retweet/:id", {
-        id: status.id_str
-      });
-      if (response) {
-        console.log("Successfully retweeted");
-      }
-    }
-  } catch (err) {
-    // catch all log if the search/retweet could not be executed
-    console.error("Err:", err);
-  }
-};
-
-retweetUsers();
-
-setInterval(function() {
-  http.get("https://twitterbot-retweet.herokuapp.com/");
-}, 86400000); // checks app every 24 hours
+retweetTags();
+setInterval(() => {
+  retweetTags();
+}, 1000 * timer)
