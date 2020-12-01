@@ -2,6 +2,6 @@ module.exports = {
   apps: [{
     name: "TwitterBot",
     script: 'index.js',
-    watch: '.',
+    watch: false
   }]
 };
