@@ -40,7 +40,7 @@ let retweetTags = async function () {
   let latest_id = 0;
 
   if (fs.existsSync(latest_id_path)) {
-    latest_id = Number(fs.readFileSync(latest_id_path, "utf8"));
+    latest_id = fs.readFileSync(latest_id_path, "utf8");
     if (!latest_id) {
       latest_id = 0;
     }
@@ -51,17 +51,20 @@ let retweetTags = async function () {
   try {
     const { data } = await Twitter.get("search/tweets", {
       q: hashtag,
-      result_type: "mixed",
+      result_type: "recent",
       lang: "en",
-      count: retweet_count,
+      count: 100,
       since_id: latest_id
     });
 
-    if (data.statuses && data.statuses.length > 0) fs.writeFileSync(latest_id_path, data.statuses[0].id)
-    const statuses = data.statuses.filter((o) => !o.retweeted);
-    console.log("Tweet Count", statuses.length);
+    let statuses = data.statuses.filter((o) => !o.retweeted && !o.retweeted_status);
+    statuses = statuses.reverse();
+    statuses = statuses.splice(0, retweet_count)
+
+    console.log("Tweet Count Check:", statuses.length)
+
     if (statuses && statuses.length > 0) {
-      fs.writeFileSync(latest_id_path, statuses[0].id)
+      fs.writeFileSync(latest_id_path, statuses[statuses.length - 1].id_str)
 
       for (const status of statuses) {
         // the post action
