@@ -67,7 +67,7 @@ let retweetTags = async function () {
     });
 
     let statuses = data.statuses.filter((o) => !o.retweeted && !o.retweeted_status);
-    statuses = data.statuses.filter((o) => banned_users.indexOf(o.user.id_str) === -1);
+    statuses = statuses.filter((o) => banned_users.indexOf(o.user.id_str) === -1);
 
     statuses = statuses.reverse();
     statuses = statuses.splice(0, retweet_count)
