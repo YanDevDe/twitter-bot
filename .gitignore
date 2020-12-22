@@ -1,3 +1,4 @@
 .env
 /node_modules/
 latest_id.txt
+banned_users.txt

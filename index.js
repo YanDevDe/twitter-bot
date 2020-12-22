@@ -28,6 +28,15 @@ if (!process.env.RETWEET_COUNT) {
 
 const retweet_count = Number(process.env.RETWEET_COUNT);
 
+let banned_users = fs.readFileSync(path.resolve(__dirname, "banned_users.txt"), "utf8");
+
+if (banned_users && typeof banned_users === "string") {
+  banned_users = banned_users.split(/[\r\n]+/);
+} else {
+  banned_users = [];
+}
+
+console.log("Banned Users: " + banned_users.join(", "));
 
 console.log(hashtag + " is being used for retweets");
 
@@ -58,8 +67,12 @@ let retweetTags = async function () {
     });
 
     let statuses = data.statuses.filter((o) => !o.retweeted && !o.retweeted_status);
+    statuses = data.statuses.filter((o) => banned_users.indexOf(o.user.id_str) === -1);
+
     statuses = statuses.reverse();
     statuses = statuses.splice(0, retweet_count)
+
+    console.log(statuses);
 
     console.log("Tweet Count Check:", statuses.length)
 
